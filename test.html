@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Archus - Beat Sync</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  margin: 0;
+  background: #0a0a0a;
+  color: white;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  touch-action: none;
+}
+
+/* background canvas */
+canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* center content */
+.container {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(-50px);
+  animation: fadeInDrop 1s ease-out 0.5s forwards;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+h1 {
+  font-size: 18px;
+  letter-spacing: 6px;
+  opacity: 0.8;
+}
+
+button {
+  margin-top: 20px;
+  padding: 12px 20px;
+  border-radius: 30px;
+  border: none;
+  cursor: pointer;
+  background: white;
+  color: black;
+  font-weight: bold;
+  transition: transform 0.3s ease;
+}
+
+button:hover {
+  transform: scale(1.05);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* bars */
+.bars {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3px;
+  height: 80px;
+  align-items: flex-end;
+  opacity: 0;
+  animation: fadeIn 1s ease-out 1.5s forwards;
+}
+
+.bar {
+  width: 4px;
+  height: 10px;
+  background: white;
+  opacity: 0.85;
+}
+
+@keyframes fadeInDrop {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="c"></canvas>
+
+<div class="container">
+  <h1>ARCHUS</h1>
+  <button id="playBtn" onclick="toggleAudio()">
+    <svg id="playIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5v14l11-7z"/>
+    </svg>
+    <svg id="pauseIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+    </svg>
+  </button>
+</div>
+
+<div class="bars" id="bars"></div>
+
+<!-- ✅ YOUR LOCAL AUDIO FILE -->
+<audio id="audio" src="audio.mp3"></audio>
+
+<script>
+const audio = document.getElementById("audio");
+const barsContainer = document.getElementById("bars");
+
+const BAR_COUNT = 32;
+const bars = [];
+
+for (let i = 0; i < BAR_COUNT; i++) {
+  const b = document.createElement("div");
+  b.className = "bar";
+  barsContainer.appendChild(b);
+  bars.push(b);
+}
+
+let ctx, analyser, dataArray;
+
+function toggleAudio() {
+  if (audio.paused) {
+    audio.play();
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = 'block';
+  } else {
+    audio.pause();
+    playIcon.style.display = 'block';
+    pauseIcon.style.display = 'none';
+  }
+
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = ctx.createAnalyser();
+
+    const source = ctx.createMediaElementSource(audio);
+    source.connect(analyser);
+    analyser.connect(ctx.destination);
+
+    analyser.fftSize = 64;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    animate();
+  }
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  analyser.getByteFrequencyData(dataArray);
+
+  fadeInOpacity = Math.min(fadeInOpacity + 0.02, 1);
+
+  for (let i = 0; i < bars.length; i++) {
+    let value = dataArray[i];
+    bars[i].style.height = (value / 2) + "px";
+  }
+
+  drawRaindrops();
+}
+
+/* raindrops */
+const canvas = document.getElementById("c");
+const c = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const raindrops = Array.from({ length: 150 }, () => ({
+  x: Math.random() * canvas.width,
+  y: Math.random() * canvas.height,
+  speed: Math.random() * 1 + 0.5,
+  length: Math.random() * 30 + 10
+}));
+
+let fadeInOpacity = 0;
+
+function drawRaindrops() {
+  c.clearRect(0, 0, canvas.width, canvas.height);
+
+  let isPaused = audio.paused;
+
+  for (let drop of raindrops) {
+    let currentSpeed = isPaused ? drop.speed * 0.3 : drop.speed;
+    let currentLength = isPaused ? drop.length * 1.5 : drop.length;
+    let currentOpacity = isPaused ? 0.1 : 0.3;
+
+    drop.y += currentSpeed;
+
+    if (drop.y > canvas.height) {
+      drop.y = 0;
+      drop.x = Math.random() * canvas.width;
+    }
+
+    c.beginPath();
+    c.moveTo(drop.x, drop.y);
+    c.lineTo(drop.x, drop.y + currentLength);
+    c.strokeStyle = `rgba(255,255,255,${currentOpacity * fadeInOpacity})`;
+    c.lineWidth = 1;
+    c.stroke();
+  }
+}
+</script>
+
+</body>
+</html>
